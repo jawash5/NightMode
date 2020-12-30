@@ -39,7 +39,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
                 android:textSize="20sp"
-                android:text="护眼模式：--"
+                android:text="夜间模式：--"
                 android:textColor="@color/mainWord"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
@@ -109,7 +109,7 @@
                     android:id="@+id/tv_openTiming"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="定时开关护眼模式"
+                    android:text="疲劳提醒"
                     android:textColor="#ffffff"
                     android:textSize="16sp"
                     app:layout_constraintStart_toStartOf="parent"
@@ -119,10 +119,10 @@
                     android:id="@+id/timingButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="定时器"
+                    android:text="已开启"
+                    app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintHorizontal_bias="1.0"
-                    app:layout_constraintTop_toBottomOf="@id/tv_openTiming" />
+                    app:layout_constraintTop_toTopOf="parent" />
 
             </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -134,13 +134,14 @@
                 app:layout_constraintEnd_toEndOf="parent"
                 android:background="@drawable/shape_corner"
                 android:padding="12dp"
-                android:layout_marginTop="30dp">
+                android:layout_marginTop="30dp"
+                android:layout_marginBottom="30dp">
 
                 <TextView
                     android:id="@+id/tv_openRemind"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="夜间模式高光自动关闭/昏暗自动开启"
+                    android:text="夜间模式 高光自动关闭 /\n昏暗自动开启"
                     android:textColor="#ffffff"
                     android:textSize="16sp"
                     app:layout_constraintStart_toStartOf="parent"
@@ -151,8 +152,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="已开启"
+                    app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/tv_openRemind" />
+                    app:layout_constraintTop_toTopOf="parent" />
 
             </androidx.constraintlayout.widget.ConstraintLayout>
 

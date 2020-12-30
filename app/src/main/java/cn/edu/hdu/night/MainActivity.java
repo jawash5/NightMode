@@ -1,18 +1,15 @@
 package cn.edu.hdu.night;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
-import android.Manifest;
+import android.app.AlarmManager;
 import android.app.Dialog;
-import android.app.ProgressDialog;
+import android.app.PendingIntent;
+import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -31,9 +28,7 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.util.ArrayList;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
 
@@ -54,14 +49,16 @@ public class MainActivity extends AppCompatActivity {
 
     private Boolean isON = true; // 是否开启
     private Boolean openAutoMonitor = true; //自动开启关闭监听
+    private Boolean openTimingTip = true; //疲劳用眼提醒
+
     int mode = 0; //模式：0：夜间模式 1：阅读模式 2：游戏模式
+    String[] modeStr = {"夜间模式", "阅读模式", "游戏模式"};
     private int[][] modeParameter = {{20,0,0,0,0},
             {20,82,52,0,0}, {20,84,206,95,0}}; // 亮度、红、绿、蓝、进度条原始值
 
-//    private AlarmManagerUtils alarmManagerUtils;
-
-
     private SensorManager sensorManager;  //感应器管理器
+    private AlarmManager am; //疲劳计时器
+    private PendingIntent pi;
 
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -72,17 +69,12 @@ public class MainActivity extends AppCompatActivity {
         permission(); //权限检测
         initView(); //初始化赋值
         getData(); //初始化用户设置
-        openWindow(); //打开dialog窗口
+        openWindow(); // 功能初始化
         initListener(); //初始化监听器
-
-//        //定时器工具类
-//        alarmManagerUtils = AlarmManagerUtils.getInstance(MainActivity.this);
-//        alarmManagerUtils.createGetUpAlarmManager();
-
-
     }
 
-    public void permission() {
+    //悬浮窗权限申请
+    private void permission() {
         // 打开应用设置
         if (Build.VERSION.SDK_INT >= 23) {
             if (!Settings.canDrawOverlays(MainActivity.this)) {
@@ -105,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     //获取存储 sharePrefrence 保存的数据
-    public void getData(){
+    private void getData(){
         SharedPreferences preferences = getSharedPreferences("myPreference", Context.MODE_PRIVATE);
         modeParameter[0][0] = preferences.getInt("nightAlpha",20);
         modeParameter[0][4] = preferences.getInt("nightProgress",10);
@@ -114,9 +106,10 @@ public class MainActivity extends AppCompatActivity {
         modeParameter[2][0] = preferences.getInt("gameAlpha",20);
         modeParameter[2][4] = preferences.getInt("gameProgress",10);
         openAutoMonitor = preferences.getBoolean("openAutoMonitor", true);
+        openTimingTip = preferences.getBoolean("openTimingTip", true);
     }
 
-    //打开 dailog 窗口,对 dailog 初始化
+    //打开 dailog 窗口,对 dailog等功能初始化
     @RequiresApi(api = Build.VERSION_CODES.O)
     private void openWindow() {
         dialog = new Dialog(this, R.style.dialog_translucent);
@@ -136,14 +129,38 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
 
         seekBar.setProgress(modeParameter[mode][4]); // 设置seekBar的进度数
-        String percent = "护眼模式：" + modeParameter[mode][4] + "%";
+
+        String percent = modeStr[mode] + "：" + modeParameter[mode][4] + "%";
         percentageText.setText(percent); // 进度条数值显示
         imageView.setBackgroundColor(Color.argb(modeParameter[mode][0],modeParameter[mode][1],
                 modeParameter[mode][2],modeParameter[mode][3]));
 
         if (openAutoMonitor) {
             registerLightMSensor();
+        } else {
+            autoButton.setText("已关闭");
         }
+
+        if (openTimingTip) {
+            setAlarm(); //护眼闹钟提醒
+        } else {
+            timingButton.setText("已关闭");
+        }
+    }
+
+    private void setAlarm() {
+        //创建Intent对象，action为ELITOR_CLOCK
+        Intent intent = new Intent("MyAlarmBroadCast");
+
+        //定义一个PendingIntent对象，PendingIntent.getBroadcast包含了sendBroadcast的动作。
+        pi = PendingIntent.getBroadcast(MainActivity.this,0, intent,0);
+
+        //AlarmManager对象，Alarmmanager为系统级服务
+        am = (AlarmManager)getSystemService(ALARM_SERVICE);
+
+        // 设置闹钟从当前时间开始，每隔1h执行一次PendingIntent对象pi
+        // 1h后通过PendingIntent pi对象发送广播, 闹钟在手机睡眠状态下不可用
+        am.setRepeating(AlarmManager.RTC, System.currentTimeMillis(),60*60*1000, pi);
     }
 
     private void initListener() {
@@ -157,7 +174,7 @@ public class MainActivity extends AppCompatActivity {
                 imageView.setBackgroundColor(Color.argb(modeParameter[mode][0], modeParameter[mode][1],
                         modeParameter[mode][2], modeParameter[mode][3]));
 
-                String percent = "护眼模式：" + modeParameter[mode][4] + "%"; // 进度条数值显示
+                String percent = modeStr[mode] + "：" +  modeParameter[mode][4] + "%"; // 进度条数值显示
                 percentageText.setText(percent);
                 saveData(); //保存用户的修改数据
             }
@@ -227,8 +244,21 @@ public class MainActivity extends AppCompatActivity {
         timingButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-//                alarmManagerUtils.getUpAlarmManagerStartWork();
-                Toast.makeText(getApplicationContext(),"设置成功",Toast.LENGTH_SHORT).show();
+                openTimingTip = !openTimingTip;
+                if (openTimingTip) {
+                    setAlarm();
+                    timingButton.setText("已开启");
+                    Toast.makeText(MainActivity.this, "疲劳提醒 开启成功", Toast.LENGTH_SHORT).show();
+                } else {
+                    timingButton.setText("已关闭");
+                    Toast.makeText(MainActivity.this, "疲劳提醒 关闭成功", Toast.LENGTH_SHORT).show();
+
+                    am.cancel(pi);
+                }
+                SharedPreferences myPreference = getSharedPreferences("myPreference", Context.MODE_PRIVATE);
+                SharedPreferences.Editor editor = myPreference.edit();
+                editor.putBoolean("openTimingTip", openTimingTip);
+                editor.apply();
             }
         });
 
@@ -240,11 +270,12 @@ public class MainActivity extends AppCompatActivity {
                 if (openAutoMonitor) {
                     registerLightMSensor();
                     autoButton.setText("已开启");
+                    Toast.makeText(MainActivity.this, "高光自动关闭/昏暗自动开启\n开启成功", Toast.LENGTH_SHORT).show();
                 } else {
                     autoButton.setText("已关闭");
+                    Toast.makeText(MainActivity.this, "高光自动关闭/昏暗自动开启\n关闭成功", Toast.LENGTH_SHORT).show();
                     //注销监听器
                     sensorManager.unregisterListener(listener);
-                    listener = null;
                 }
                 SharedPreferences myPreference = getSharedPreferences("myPreference", Context.MODE_PRIVATE);
                 SharedPreferences.Editor editor = myPreference.edit();
@@ -294,10 +325,10 @@ public class MainActivity extends AppCompatActivity {
             if (mode == 0) {
                 if (lowCount == 4 && !isON) {
                     switchButton.callOnClick();
-                    Toast.makeText(MainActivity.this, "已自动开启夜间模式",Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "已自动开启夜间模式",Toast.LENGTH_LONG).show();
                 } else if(topCount == 4 && isON) {
                     switchButton.callOnClick();
-                    Toast.makeText(MainActivity.this, "已自动关闭夜间模式",Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "已自动关闭夜间模式",Toast.LENGTH_LONG).show();
                 }
             }
         }
@@ -309,7 +340,7 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    public void saveData(){
+    private void saveData(){
         SharedPreferences myPreference = getSharedPreferences("myPreference", Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = myPreference.edit();
         editor.putInt("nightAlpha", modeParameter[0][0]); // 夜间模式亮度
@@ -329,6 +360,9 @@ public class MainActivity extends AppCompatActivity {
             //注销监听器
             sensorManager.unregisterListener(listener);
             listener = null;
+        }
+        if (openTimingTip) {
+            am.cancel(pi);
         }
     }
 }
