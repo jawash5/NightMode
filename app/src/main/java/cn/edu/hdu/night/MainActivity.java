@@ -58,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
 
     private SensorManager sensorManager;  //感应器管理器
     private AlarmManager am; //疲劳计时器
-    private PendingIntent pi;
+    private PendingIntent pi; //发送的intent
 
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -116,8 +116,8 @@ public class MainActivity extends AppCompatActivity {
         dialog.setContentView(R.layout.dialog);
 
         WindowManager.LayoutParams lp = Objects.requireNonNull(dialog.getWindow()).getAttributes();
-        lp.width = WindowManager.LayoutParams.MATCH_PARENT;
-        lp.height = WindowManager.LayoutParams.MATCH_PARENT;
+        lp.width = WindowManager.LayoutParams.MATCH_PARENT; //匹配屏幕宽度
+        lp.height = WindowManager.LayoutParams.MATCH_PARENT; //匹配屏幕高度
         lp.flags =WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | // 把该window之外的任何event发送到该window之后的其他window.
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | //不能获取焦点
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;  //不能触摸，设置不影响下层的触碰
@@ -136,7 +136,7 @@ public class MainActivity extends AppCompatActivity {
                 modeParameter[mode][2],modeParameter[mode][3]));
 
         if (openAutoMonitor) {
-            registerLightMSensor();
+            registerLightMSensor(); //注册光传感器
         } else {
             autoButton.setText("已关闭");
         }
@@ -149,7 +149,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setAlarm() {
-        //创建Intent对象，action为ELITOR_CLOCK
+        //创建Intent对象，action为MyAlarmBroadCast
         Intent intent = new Intent("MyAlarmBroadCast");
 
         //定义一个PendingIntent对象，PendingIntent.getBroadcast包含了sendBroadcast的动作。
@@ -255,6 +255,7 @@ public class MainActivity extends AppCompatActivity {
 
                     am.cancel(pi);
                 }
+                // 存储用户设置
                 SharedPreferences myPreference = getSharedPreferences("myPreference", Context.MODE_PRIVATE);
                 SharedPreferences.Editor editor = myPreference.edit();
                 editor.putBoolean("openTimingTip", openTimingTip);
@@ -277,6 +278,7 @@ public class MainActivity extends AppCompatActivity {
                     //注销监听器
                     sensorManager.unregisterListener(listener);
                 }
+                // 存储用户设置
                 SharedPreferences myPreference = getSharedPreferences("myPreference", Context.MODE_PRIVATE);
                 SharedPreferences.Editor editor = myPreference.edit();
                 editor.putBoolean("openAutoMonitor", openAutoMonitor);
@@ -301,20 +303,21 @@ public class MainActivity extends AppCompatActivity {
     //感应器事件监听器
     private SensorEventListener listener = new SensorEventListener() {
         Queue<Float> data = new LinkedList<>();
-
+        int topCount; //峰值计数器
+        int lowCount; //谷值计数器
         //当传感器监测到的数值发生变化时
         @Override
         public void onSensorChanged(SensorEvent event) {
-            Log.d(TAG, "onSensorChanged: " + event.values[0]);
-            int topCount = 0; //峰值计数器
-            int lowCount = 0; //谷值计数器
+//            Log.d(TAG, "onSensorChanged: " + event.values[0]);
+            topCount = 0;
+            lowCount = 0;
             if (data.size() == 4) {
                 data.poll();
                 data.offer(event.values[0]);         // values数组中第一个值就是当前的光照强度
                 for (float v : data) {
                     if (v > 500) {
                         topCount++;
-                    } else if (v < 50) {
+                    } else if (v < 30) {
                         lowCount++;
                     }
                 }
@@ -333,13 +336,13 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-
         //当感应器精度发生变化
         @Override
         public void onAccuracyChanged(Sensor sensor, int accuracy) {
         }
     };
 
+    // 保存用户数据
     private void saveData(){
         SharedPreferences myPreference = getSharedPreferences("myPreference", Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = myPreference.edit();
@@ -362,7 +365,7 @@ public class MainActivity extends AppCompatActivity {
             listener = null;
         }
         if (openTimingTip) {
-            am.cancel(pi);
+            am.cancel(pi); // 取消定制闹钟
         }
     }
 }
